@@ -1,6 +1,7 @@
 package com.hgframework.demo.cglib;
 
 /**
+ * 可以参考 http://blog.csdn.net/danchu/article/details/70238002
  * Created by Administrator on 2017/12/5 0005.
  */
 public class CglibMain {
