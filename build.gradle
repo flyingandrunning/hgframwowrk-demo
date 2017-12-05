@@ -1,0 +1,22 @@
+group 'com.hgframework.demo'
+version '1.0-SNAPSHOT'
+
+apply plugin: 'java'
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile group: 'org.springframework.boot', name: 'spring-boot', version: '1.5.9.RELEASE'
+    compile group: 'org.apache.sqoop', name: 'sqoop-client', version: '1.99.4'
+    compile group: 'org.springframework', name: 'spring-tx', version: '4.3.13.RELEASE'
+    compile "org.springframework.boot:spring-boot-starter-web:1.5.9.RELEASE"
+    compile group: 'org.aspectj', name: 'aspectjrt', version: '1.8.11'
+    compile group: 'com.alibaba', name: 'fastjson', version: '1.2.41'
+    compile group: 'org.aspectj', name: 'aspectjweaver', version: '1.8.11'
+
+
+}
