@@ -7,6 +7,7 @@ sourceCompatibility = 1.8
 
 repositories {
     mavenCentral()
+    jcenter()
 }
 
 dependencies {
@@ -17,6 +18,9 @@ dependencies {
     compile group: 'org.aspectj', name: 'aspectjrt', version: '1.8.11'
     compile group: 'com.alibaba', name: 'fastjson', version: '1.2.41'
     compile group: 'org.aspectj', name: 'aspectjweaver', version: '1.8.11'
+    compile group: 'io.reactivex.rxjava2', name: 'rxjava', version: '2.1.7'
+    compile group: 'com.netflix.hystrix', name: 'hystrix-core', version: '1.5.13'
+    compile group: 'io.reactivex', name: 'rxjava', version: '1.2.0'
 
 
 }
