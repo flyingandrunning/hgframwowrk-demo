@@ -23,7 +23,7 @@ public class DemoControllerAspect {
     //匹配com.hgframework.demo.aop.controller包及其子包下的所有类的所有方法
     @Pointcut("execution(* com.hgframework.demo.aop.controller..*.*(..))")
     public void executeService() {
-        System.out.println("%%%%%%%%%%%%%%%%执行应用调用%%%%%%%%%%%%%%%%%%");
+        /*注意内部仅仅为注解型方法，没有任何实现，其实相当于切点，供其他通知使用*/
     }
 
     /**
