@@ -4,6 +4,7 @@ import org.apache.curator.RetryPolicy;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.framework.recipes.cache.PathChildrenCache;
+import org.apache.curator.framework.recipes.locks.InterProcessReadWriteLock;
 import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.data.Stat;
@@ -25,6 +26,8 @@ public class DConfigCenter {
     private PathChildrenCache pathChildrenCache;
     //参数池
     private Map<String, TransMetaData> parameterPools = new HashMap<>();
+    //读写锁控制
+    private InterProcessReadWriteLock rwlock;
 
     public void init() throws Exception {
         RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
@@ -58,41 +61,56 @@ public class DConfigCenter {
             }
         });
         this.pathChildrenCache.start(PathChildrenCache.StartMode.NORMAL);
+        //初始化锁
+        this.rwlock = new InterProcessReadWriteLock(this.curatorFramework, STORE_PATH);
     }
 
     public void put(String key, TransMetaData value) throws Exception {
+
         String removeKey = builderKey(key);
         //本地数据同步
         this.parameterPools.put(key, value);
-        //写入到zk
-        Stat stat = this.curatorFramework.checkExists().forPath(removeKey);
-        byte[] bytes = SerializableUtils.encode(value);
-        if (null != stat) {
-            this.curatorFramework.setData().forPath(removeKey, bytes);
-            return;
+        try {
+            this.rwlock.writeLock().acquire();  //写入到zk
+            Stat stat = this.curatorFramework.checkExists().forPath(removeKey);
+            byte[] bytes = SerializableUtils.encode(value);
+            if (null != stat) {
+                this.curatorFramework.setData().forPath(removeKey, bytes);
+                return;
+            }
+            //如果数据不存在，创建新节点做持久化处理
+            this.curatorFramework.create()
+                    .creatingParentsIfNeeded()
+                    .withMode(CreateMode.PERSISTENT)
+                    .forPath(removeKey, bytes);
+        } finally {
+            this.rwlock.writeLock().release();
         }
-        //如果数据不存在，创建新节点做持久化处理
-        this.curatorFramework.create()
-                .creatingParentsIfNeeded()
-                .withMode(CreateMode.PERSISTENT)
-                .forPath(removeKey, bytes);
+
+
     }
 
     public TransMetaData get(String key, boolean isRemote) throws Exception {
         if (!isRemote) {
             return this.parameterPools.get(key);
         }
-        //从远程获取数据信息
-        String removeKey = builderKey(key);
-        Stat stat = this.curatorFramework.checkExists().forPath(removeKey);
-        if (null == stat) {
-            return null;
+        try {
+            this.rwlock.readLock().acquire();
+            //从远程获取数据信息
+            String removeKey = builderKey(key);
+            Stat stat = this.curatorFramework.checkExists().forPath(removeKey);
+            if (null == stat) {
+                return null;
+            }
+            byte[] bytes = this.curatorFramework.getData().forPath(removeKey);
+            TransMetaData transMetaData = (TransMetaData) SerializableUtils.decode(bytes);
+            //更新本地缓存
+            this.parameterPools.put(key, transMetaData);
+            return transMetaData;
+        } finally {
+            this.rwlock.readLock().release();
         }
-        byte[] bytes = this.curatorFramework.getData().forPath(removeKey);
-        TransMetaData transMetaData = (TransMetaData) SerializableUtils.decode(bytes);
-        //更新本地缓存
-        this.parameterPools.put(key, transMetaData);
-        return transMetaData;
+
     }
 
 
@@ -105,11 +123,17 @@ public class DConfigCenter {
     public void remove(String key) throws Exception {
         //不一定能del成功，本地不一定有远程key,可能有算法同步问题,网络延迟问题
         this.parameterPools.remove(key);
-        String removeKey = builderKey(key);
-        Stat stat = this.curatorFramework.checkExists().forPath(removeKey);
-        if (stat != null) {
-            this.curatorFramework.delete().guaranteed().forPath(removeKey);
+        try {
+            this.rwlock.writeLock().acquire();
+            String removeKey = builderKey(key);
+            Stat stat = this.curatorFramework.checkExists().forPath(removeKey);
+            if (stat != null) {
+                this.curatorFramework.delete().guaranteed().forPath(removeKey);
+            }
+        } finally {
+            this.rwlock.writeLock().release();
         }
+
 
     }
 
@@ -206,7 +230,7 @@ public class DConfigCenter {
         DConfigCenter configCenter = new DConfigCenter();
         configCenter.init();
         TransMetaData transMetaData = configCenter.get("trans_id", true);
-        System.out.println("远程数据配置信息如下:\\n"+transMetaData);
+        System.out.println("远程数据配置信息如下:\n" + transMetaData);
         configCenter.close();
     }
 
