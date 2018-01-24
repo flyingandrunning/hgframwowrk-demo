@@ -1,10 +1,12 @@
 package com.hgframework.demo.zk;
 
+import java.io.Serializable;
+
 /**
  * 事务分录，可以认为就是子事务
  * Created by Administrator on 2018/1/24 0024.
  */
-public class TransEntry<T extends TransObject> {
+public class TransEntry<T extends TransObject> implements Serializable{
 
     //全局事务Id
     private String gobalTransId;

@@ -27,7 +27,6 @@ public class DConfigCenter {
     private Map<String, TransMetaData> parameterPools = new HashMap<>();
 
     public void init() throws Exception {
-
         RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
         this.curatorFramework = CuratorFrameworkFactory.builder()
                 .connectString(ZK_HOST)
@@ -78,6 +77,24 @@ public class DConfigCenter {
                 .withMode(CreateMode.PERSISTENT)
                 .forPath(removeKey, bytes);
     }
+
+    public TransMetaData get(String key, boolean isRemote) throws Exception {
+        if (!isRemote) {
+            return this.parameterPools.get(key);
+        }
+        //从远程获取数据信息
+        String removeKey = builderKey(key);
+        Stat stat = this.curatorFramework.checkExists().forPath(removeKey);
+        if (null == stat) {
+            return null;
+        }
+        byte[] bytes = this.curatorFramework.getData().forPath(removeKey);
+        TransMetaData transMetaData = (TransMetaData) SerializableUtils.decode(bytes);
+        //更新本地缓存
+        this.parameterPools.put(key, transMetaData);
+        return transMetaData;
+    }
+
 
     /**
      * 删除key
@@ -149,6 +166,10 @@ public class DConfigCenter {
     }
 
     public static void main(String[] args) throws Exception {
+        testGet();
+    }
+
+    public static void testPut() throws Exception {
         TransMetaData dTransMetaData = new TransMetaData();
         dTransMetaData.setStartTime(System.currentTimeMillis());
         dTransMetaData.setTransId(UUID.randomUUID().toString());
@@ -168,10 +189,26 @@ public class DConfigCenter {
         dataSyncTransObject.setSplitNo(1);
         dataSyncTransObject.setSplitEnd(new Date());
         entry.setTransObj(dataSyncTransObject);
-        dTransMetaData.getTransQueue().put(entry.getEntryId(),entry);
+        dTransMetaData.getTransQueue().put(entry.getEntryId(), entry);
         dTransMetaData.setEndTime(System.currentTimeMillis());
-        byte[] bytes = SerializableUtils.encode(dTransMetaData);
-        TransMetaData decodeDTransMetaData = (TransMetaData) SerializableUtils.decode(bytes);
-        System.out.println(decodeDTransMetaData);
+//        byte[] bytes = SerializableUtils.encode(dTransMetaData);
+//        TransMetaData decodeDTransMetaData = (TransMetaData) SerializableUtils.decode(bytes);
+//        System.out.println(decodeDTransMetaData);
+        DConfigCenter configCenter = new DConfigCenter();
+        configCenter.init();
+        configCenter.put("trans_id", dTransMetaData);
+//        TransMetaData transMetaData=configCenter.get("trans_id",true);
+//        System.out.println(transMetaData);
+        configCenter.close();
     }
+
+    public static void testGet() throws Exception {
+        DConfigCenter configCenter = new DConfigCenter();
+        configCenter.init();
+        TransMetaData transMetaData = configCenter.get("trans_id", true);
+        System.out.println("远程数据配置信息如下:\\n"+transMetaData);
+        configCenter.close();
+    }
+
+
 }
