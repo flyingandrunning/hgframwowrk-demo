@@ -10,7 +10,6 @@ public class TransMetaData implements Serializable {
 
     //全局事务Id uuid标识
     private String transId;
-
     //事务名称
     private String name;
     //事务开始时间
