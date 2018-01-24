@@ -4,6 +4,7 @@ import org.apache.curator.RetryPolicy;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.framework.recipes.cache.PathChildrenCache;
+import org.apache.curator.framework.recipes.cache.PathChildrenCacheEvent;
 import org.apache.curator.framework.recipes.locks.InterProcessReadWriteLock;
 import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.zookeeper.CreateMode;
@@ -17,7 +18,10 @@ import java.util.*;
  */
 public class DConfigCenter {
 
+    //数据目录
     private static final String STORE_PATH = "/auto/sync/dev/para";
+    //分布式锁路径
+    private static final String STORE_LOCKS = "/auto/sync/dev/locks";
 
     private static final String ZK_HOST = "devtest.node3.com:2181,devtest.node3.com:2181,devtest.node3.com:2181";
     //zk客户端
@@ -30,7 +34,7 @@ public class DConfigCenter {
     private InterProcessReadWriteLock rwlock;
 
     public void init() throws Exception {
-        RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
+        RetryPolicy retryPolicy = new ExponentialBackoffRetry(10000, 3);
         this.curatorFramework = CuratorFrameworkFactory.builder()
                 .connectString(ZK_HOST)
                 .sessionTimeoutMs(5000)
@@ -41,32 +45,51 @@ public class DConfigCenter {
         this.curatorFramework.start();
         //路径初始化
         pathChildrenCache = new PathChildrenCache(curatorFramework, STORE_PATH, true);
+
         this.pathChildrenCache.getListenable().addListener((client, event) -> {
             switch (event.getType()) {
                 case CHILD_ADDED:
-                    System.out.println("新节点加入");
+                    innerAdd(event);
                     break;
                 case INITIALIZED:
-                    System.out.println("初始化，加载相关配置信息");
+                    //初始化，加载相关配置信息,且刷新本地缓存
                     break;
                 case CHILD_REMOVED:
-                    System.out.println("节点del，从本地del相关数据信息");
+                    //节点del，从本地del相关数据信息
+                    String removePath = event.getData().getPath();
+                    if (STORE_PATH.startsWith(removePath)) {
+                        String remoteKey = removePath.substring(removePath.lastIndexOf("/"));
+                        parameterPools.remove(remoteKey);
+                    }
                     break;
                 case CHILD_UPDATED:
-                    System.out.println("将远程信息更新到本地");
+                    innerAdd(event);
                     break;
                 case CONNECTION_RECONNECTED:
-                    System.out.println("需检查有没有信息变更");
+                    //重新连接，刷新本地缓存数据
                     break;
             }
         });
         this.pathChildrenCache.start(PathChildrenCache.StartMode.NORMAL);
         //初始化锁
-        this.rwlock = new InterProcessReadWriteLock(this.curatorFramework, STORE_PATH);
+        this.rwlock = new InterProcessReadWriteLock(this.curatorFramework, STORE_LOCKS);
+    }
+
+    private void innerAdd(PathChildrenCacheEvent event) throws Exception {
+        //本质已经包含子路径
+        String remotePath = event.getData().getPath();
+        if (remotePath.startsWith(STORE_PATH)) {
+            //更新本地cache
+            String remoteKey = remotePath.substring(remotePath.lastIndexOf("/"));
+            if (event.getData() != null) {
+                TransMetaData transMetaData = (TransMetaData) SerializableUtils
+                        .decode(event.getData().getData());
+                parameterPools.put(remoteKey, transMetaData);
+            }
+        }
     }
 
     public void put(String key, TransMetaData value) throws Exception {
-
         String removeKey = builderKey(key);
         //本地数据同步
         this.parameterPools.put(key, value);
@@ -191,6 +214,7 @@ public class DConfigCenter {
 
     public static void main(String[] args) throws Exception {
         testGet();
+//        Thread.currentThread().join();
     }
 
     public static void testPut() throws Exception {
@@ -220,7 +244,7 @@ public class DConfigCenter {
 //        System.out.println(decodeDTransMetaData);
         DConfigCenter configCenter = new DConfigCenter();
         configCenter.init();
-        configCenter.put("trans_id", dTransMetaData);
+        configCenter.put("trans_id2", dTransMetaData);
 //        TransMetaData transMetaData=configCenter.get("trans_id",true);
 //        System.out.println(transMetaData);
         configCenter.close();
