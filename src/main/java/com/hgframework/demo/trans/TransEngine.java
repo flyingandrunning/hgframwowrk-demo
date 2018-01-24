@@ -10,6 +10,11 @@ public class TransEngine {
     //事务监控，健康检查，
     //事务回滚，或者事务推进
 
+    //接受事务提交处理
+    public boolean submit() {
+        return false;
+    }
+
     public void execute() {
 
     }
