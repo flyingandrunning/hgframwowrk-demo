@@ -1,4 +1,4 @@
-package com.hgframework.demo.zk;
+package com.hgframework.demo.trans;
 
 import java.io.Serializable;
 import java.util.LinkedHashMap;
@@ -6,10 +6,13 @@ import java.util.LinkedHashMap;
 /**
  * Created by Administrator on 2018/1/24 0024.
  */
-public class TransMetaData implements Serializable{
+public class TransMetaData implements Serializable {
 
     //全局事务Id uuid标识
     private String transId;
+
+    //事务名称
+    private String name;
     //事务开始时间
     private long startTime = System.currentTimeMillis();
     //分布式事务执行队列，以map方式标识
@@ -76,6 +79,14 @@ public class TransMetaData implements Serializable{
 
     public void setPropagate(int propagate) {
         this.propagate = propagate;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
     }
 
     @Override

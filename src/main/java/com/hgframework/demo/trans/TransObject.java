@@ -1,4 +1,4 @@
-package com.hgframework.demo.zk;
+package com.hgframework.demo.trans;
 
 import java.io.Serializable;
 

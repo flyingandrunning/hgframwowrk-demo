@@ -1,4 +1,4 @@
-package com.hgframework.demo.zk;
+package com.hgframework.demo.trans;
 
 import java.io.Serializable;
 
@@ -9,7 +9,7 @@ import java.io.Serializable;
 public class TransEntry<T extends TransObject> implements Serializable{
 
     //全局事务Id
-    private String gobalTransId;
+    private String globalTransId;
     //子事务ID
     private String entryId;
 
@@ -19,12 +19,12 @@ public class TransEntry<T extends TransObject> implements Serializable{
     //事务对象，有客户端或者调用方处理，定义即所用
     private T transObj;
 
-    public String getGobalTransId() {
-        return gobalTransId;
+    public String getGlobalTransId() {
+        return globalTransId;
     }
 
-    public void setGobalTransId(String gobalTransId) {
-        this.gobalTransId = gobalTransId;
+    public void setGlobalTransId(String globalTransId) {
+        this.globalTransId = globalTransId;
     }
 
     public String getEntryId() {
@@ -54,7 +54,7 @@ public class TransEntry<T extends TransObject> implements Serializable{
     @Override
     public String toString() {
         return "TransEntry{" +
-                "gobalTransId='" + gobalTransId + '\'' +
+                "globalTransId='" + globalTransId + '\'' +
                 ", entryId='" + entryId + '\'' +
                 ", transStatus=" + transStatus +
                 ", transObj=" + transObj +

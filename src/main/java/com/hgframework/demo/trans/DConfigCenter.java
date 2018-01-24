@@ -1,4 +1,4 @@
-package com.hgframework.demo.zk;
+package com.hgframework.demo.trans;
 
 import org.apache.curator.RetryPolicy;
 import org.apache.curator.framework.CuratorFramework;
@@ -225,7 +225,8 @@ public class DConfigCenter {
         dTransMetaData.setPropagate(0);
         dTransMetaData.setTransQueue(new LinkedHashMap<>());
         TransEntry<DataSyncTransObject> entry = new TransEntry<>();
-        entry.setGobalTransId(dTransMetaData.getTransId());
+//        entry.setGobalTransId(dTransMetaData.getTransId());
+        entry.setGlobalTransId(dTransMetaData.getTransId());
         entry.setEntryId(UUID.randomUUID().toString());
         entry.setTransStatus(0);
         DataSyncTransObject dataSyncTransObject = new DataSyncTransObject();
