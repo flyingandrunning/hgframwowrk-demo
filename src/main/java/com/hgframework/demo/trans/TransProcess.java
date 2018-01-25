@@ -107,7 +107,17 @@ public class TransProcess {
         @Override
         public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
             //做事务处理，事务各项阶段
-            Object ret = method.invoke(target, args);
+            Object ret = null;
+            try {
+                //生成全局子事务编号，事务初始化
+                //执行目标方法
+                ret = method.invoke(target, args);
+                //子事务提交，事务落地
+                //结果值处理，事务收尾
+            }catch (Exception e){
+                //做异常处理
+                //数据回滚等
+            }
             return ret;
         }
     }
