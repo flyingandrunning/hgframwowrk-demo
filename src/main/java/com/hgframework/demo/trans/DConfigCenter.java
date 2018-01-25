@@ -19,7 +19,7 @@ import java.util.*;
 public class DConfigCenter {
 
     //数据目录
-    private static final String STORE_PATH = "/auto/sync/dev/para";
+    private static final String STORE_PATH = "/auto/sync/dev/para1";
     //分布式锁路径
     private static final String STORE_LOCKS = "/auto/sync/dev/locks";
 
@@ -213,6 +213,7 @@ public class DConfigCenter {
     }
 
     public static void main(String[] args) throws Exception {
+//        testPut();
         testGet();
 //        Thread.currentThread().join();
     }
@@ -254,7 +255,7 @@ public class DConfigCenter {
     public static void testGet() throws Exception {
         DConfigCenter configCenter = new DConfigCenter();
         configCenter.init();
-        TransMetaData transMetaData = configCenter.get("trans_id", true);
+        TransMetaData transMetaData = configCenter.get("trans_id2", true);
         System.out.println("远程数据配置信息如下:\n" + transMetaData);
         configCenter.close();
     }
