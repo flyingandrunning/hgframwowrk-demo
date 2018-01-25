@@ -117,6 +117,8 @@ public class TransProcess {
             }catch (Exception e){
                 //做异常处理
                 //数据回滚等
+            }catch (Error error){
+
             }
             return ret;
         }
