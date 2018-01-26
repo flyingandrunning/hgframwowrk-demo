@@ -3,10 +3,8 @@ package com.hgframework.demo.trans;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.util.Date;
-import java.util.LinkedHashMap;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Created by Administrator on 2018/1/24 0024.
@@ -15,17 +13,25 @@ public class TransProcess {
 
     //事务上下文
     private TransContext context;
-
     //分布式事务配置中心，从中获取事务配置信息
     private DConfigCenter configCenter;
-
+    //数据源功能操作
     private DataSourceFunction<DataTransObject> dataSourceFuntion;
+    //动态代理
     private JdkDynamicProxy proxy;
+    //事务挂起池，挂起或者失败池,本功能主要面向查询，回滚性比较弱，失败的事务再次推进即可，如果三次失败
+    //转入手工处理
+    private ConcurrentHashMap<String, TransMetaData> failTransPool = new ConcurrentHashMap<>();
+
+    private TransManager transManager;
 
     public TransProcess() {
+        this.configCenter = new DConfigCenter();
         proxy = new JdkDynamicProxy(new DefaultDataSourceFuntion());
         this.dataSourceFuntion = (DataSourceFunction<DataTransObject>) proxy.getProxy();
+        this.transManager = new DefaultTransManager();
     }
+
 
     //事务状态管理
     //事务推进 commit,
@@ -67,7 +73,6 @@ public class TransProcess {
         String sql;
         //记录数，用于做事务验证
         int counter;
-
     }
 
     interface DataSourceFunction<T extends TransObject> {
@@ -79,12 +84,16 @@ public class TransProcess {
      * aop 模式做事务隔离，对于外部是无感
      */
     static class DefaultDataSourceFuntion implements DataSourceFunction<DataTransObject> {
+        private static Random random = new Random();
+
         @Override
         public void doInvoke(DataTransObject transObject) throws Exception {
             System.out.println("执行具体的业务操作................................");
-            Thread.sleep((long) (30 * Math.random()));
+            //时间加大会引起执行错误，进行事务回滚
+            Thread.sleep(1000 * random.nextInt(10));
         }
     }
+
 
     static class JdkDynamicProxy implements InvocationHandler {
 
@@ -111,58 +120,27 @@ public class TransProcess {
             //做事务处理，事务各项阶段
             Object ret = null;
             try {
-                //生成全局子事务编号，事务初始化
+                //生成全局子事务编号，事务初始化,初始化已经做顺序处理
                 TransEntry entry = (TransEntry) TransSynchronizationManager.transQueue.get().poll();
                 System.out.println(entry);
                 //执行目标方法
                 ret = method.invoke(target, args);
-                System.out.println("事务提交");
+//                System.out.println("事务提交");
                 //子事务提交，事务落地
                 //结果值处理，事务收尾
             } catch (Exception e) {
                 //做异常处理
+                e.printStackTrace();
                 System.out.println("事务回滚");
                 //数据回滚等
             } catch (Error error) {
+                error.printStackTrace();
                 System.out.println("事务回滚");
             }
             return ret;
         }
     }
 
-
-//    interface InnerProcess {
-//
-//        void commit();
-//
-//        void rollback();
-//
-//        void suspend();
-//
-//        void cancel();
-//    }
-//
-//    static class DefaultInnerProcess implements InnerProcess {
-//        @Override
-//        public void commit() {
-//            System.out.println("commit");
-//        }
-//
-//        @Override
-//        public void rollback() {
-//            System.out.println("rollback");
-//        }
-//
-//        @Override
-//        public void suspend() {
-//
-//        }
-//
-//        @Override
-//        public void cancel() {
-//
-//        }
-//    }
 
     static TransMetaData initTransMetaData(int subTransSize) {
         TransMetaData dTransMetaData = new TransMetaData();
@@ -220,7 +198,7 @@ public class TransProcess {
 //        InnerProcess process = (InnerProcess) Proxy.newProxyInstance(TransProcess.class.getClassLoader(), new Class[]{InnerProcess.class}, new ProcessHandler(innerProcess));
 //        process.commit();
 //        testProcess();
-        testThreadTrans(5);
+        testThreadTrans(100);
 
     }
 

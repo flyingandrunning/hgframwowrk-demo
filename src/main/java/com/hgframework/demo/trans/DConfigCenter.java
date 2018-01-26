@@ -1,5 +1,6 @@
 package com.hgframework.demo.trans;
 
+import com.alibaba.fastjson.JSON;
 import org.apache.curator.RetryPolicy;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
@@ -192,6 +193,14 @@ public class DConfigCenter {
             oos.close();
             return bos.toByteArray();
         }
+
+//        public static byte[] encodeJson(Object o) throws IOException {
+//            String json = JSON.toJSONString(o);
+//            return json.getBytes();
+//        }
+//        public static Object decodeJson(byte[] bytes){
+//            return JSON.p
+//        }
 
         /**
          * 解码处理

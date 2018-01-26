@@ -6,7 +6,9 @@ import java.io.Serializable;
  * 事务分录，可以认为就是子事务
  * Created by Administrator on 2018/1/24 0024.
  */
-public class TransEntry<T extends TransObject> implements Serializable{
+public class TransEntry<T extends TransObject> implements Serializable {
+
+    public static final int SUCC = 3;
 
     //全局事务Id
     private String globalTransId;
@@ -18,6 +20,7 @@ public class TransEntry<T extends TransObject> implements Serializable{
 
     //事务对象，有客户端或者调用方处理，定义即所用
     private T transObj;
+
 
     public String getGlobalTransId() {
         return globalTransId;

@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
  */
 public class TransMetaData implements Serializable {
 
+    public static final int SUCC = 3;
     //全局事务Id uuid标识
     private String transId;
     //事务名称
@@ -31,6 +32,16 @@ public class TransMetaData implements Serializable {
     * */
     //事务传播性  0;无需事务，1新建事务，2.延用当前事务，如果没有创建一个，3.嵌套事务,这里无需完全严格遵循以上特性
     private int propagate;
+
+    /**
+     * 判断是不是所有的子事务都已经完成，如果完成返回true，整体事务提交
+     *
+     * @return
+     */
+    public boolean isAllSucc() {
+        return false;
+    }
+
 
     public String getTransId() {
         return transId;
