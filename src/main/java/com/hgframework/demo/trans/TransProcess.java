@@ -19,12 +19,12 @@ public class TransProcess {
     //分布式事务配置中心，从中获取事务配置信息
     private DConfigCenter configCenter;
 
-    private DataSourceFuntion<DataTransObject> dataSourceFuntion;
+    private DataSourceFunction<DataTransObject> dataSourceFuntion;
     private JdkDynamicProxy proxy;
 
     public TransProcess() {
         proxy = new JdkDynamicProxy(new DefaultDataSourceFuntion());
-        this.dataSourceFuntion = (DataSourceFuntion<DataTransObject>) proxy.getProxy();
+        this.dataSourceFuntion = (DataSourceFunction<DataTransObject>) proxy.getProxy();
     }
 
     //事务状态管理
@@ -38,9 +38,18 @@ public class TransProcess {
      * @param metaData
      */
     public void handler(TransContext context, TransMetaData metaData) throws Exception {
+        //这里加入同步事务处理
         String transId = metaData.getTransId();
+        //事务资源初始化
+        TransSynchronizationManager.init(transId);
         LinkedHashMap<String, TransEntry<?>> queue = metaData.getTransQueue();
         Set<String> queueKeys = queue.keySet();
+        //入事务队列，分配事务slot，这块需要事务容器支持，后期优化
+        for (String key : queueKeys) {
+            TransEntry entry = queue.get(key);
+            TransSynchronizationManager.transQueue.get().offer(entry);
+        }
+        //执行事务
         for (String key : queueKeys) {
             TransEntry entry = queue.get(key);
             this.dataSourceFuntion.doInvoke((DataTransObject) entry.getTransObj());
@@ -59,10 +68,9 @@ public class TransProcess {
         //记录数，用于做事务验证
         int counter;
 
-
     }
 
-    interface DataSourceFuntion<T extends TransObject> {
+    interface DataSourceFunction<T extends TransObject> {
 
         void doInvoke(T t) throws Exception;
     }
@@ -70,17 +78,11 @@ public class TransProcess {
     /**
      * aop 模式做事务隔离，对于外部是无感
      */
-    static class DefaultDataSourceFuntion implements DataSourceFuntion<DataTransObject> {
+    static class DefaultDataSourceFuntion implements DataSourceFunction<DataTransObject> {
         @Override
         public void doInvoke(DataTransObject transObject) throws Exception {
-
-            System.out.println("初始化数据库链接");
-            //查询数据分段
-            System.out.println("查询数据分段");
-            //数据进入分析容器
-            System.out.println("数据进入分析容器");
-            //从阶段做结束处理
-            System.out.println("从阶段做结束处理");
+            System.out.println("执行具体的业务操作................................");
+            Thread.sleep((long) (30 * Math.random()));
         }
     }
 
@@ -100,7 +102,7 @@ public class TransProcess {
          */
         public Object getProxy() {
             ClassLoader c = Thread.currentThread().getContextClassLoader();
-            Object obj = Proxy.newProxyInstance(c, new Class[]{DataSourceFuntion.class}, this);
+            Object obj = Proxy.newProxyInstance(c, new Class[]{DataSourceFunction.class}, this);
             return obj;
         }
 
@@ -110,15 +112,19 @@ public class TransProcess {
             Object ret = null;
             try {
                 //生成全局子事务编号，事务初始化
+                TransEntry entry = (TransEntry) TransSynchronizationManager.transQueue.get().poll();
+                System.out.println(entry);
                 //执行目标方法
                 ret = method.invoke(target, args);
+                System.out.println("事务提交");
                 //子事务提交，事务落地
                 //结果值处理，事务收尾
-            }catch (Exception e){
+            } catch (Exception e) {
                 //做异常处理
+                System.out.println("事务回滚");
                 //数据回滚等
-            }catch (Error error){
-
+            } catch (Error error) {
+                System.out.println("事务回滚");
             }
             return ret;
         }
@@ -158,35 +164,29 @@ public class TransProcess {
 //        }
 //    }
 
-    static TransMetaData initTransMetaData() {
+    static TransMetaData initTransMetaData(int subTransSize) {
         TransMetaData dTransMetaData = new TransMetaData();
         dTransMetaData.setStartTime(System.currentTimeMillis());
         dTransMetaData.setTransId(UUID.randomUUID().toString());
         dTransMetaData.setStatus(0);
         dTransMetaData.setPropagate(0);
         dTransMetaData.setTransQueue(new LinkedHashMap<>());
-        //构建子事务对象1.
-        TransEntry<TransObject> entry = new TransEntry<>();
-        entry.setGlobalTransId(dTransMetaData.getTransId());
-        entry.setEntryId(UUID.randomUUID().toString());
-        entry.setTransStatus(0);
-        DataTransObject dataTransObject = new DataTransObject();
-        dataTransObject.driverName = "com.mysql";
-        dataTransObject.hostname = "devtest";
-        dataTransObject.setStart(new Date());
-        entry.setTransObj(dataTransObject);
-        dTransMetaData.getTransQueue().put(entry.getEntryId(), entry);
-        //构建子事务对象2
-        TransEntry<TransObject> entry2 = new TransEntry<>();
-        entry2.setGlobalTransId(dTransMetaData.getTransId());
-        entry2.setEntryId(UUID.randomUUID().toString());
-        entry2.setTransStatus(0);
-        DataTransObject dataTransObject2 = new DataTransObject();
-        dataTransObject2.driverName = "com.mysql2";
-        dataTransObject2.hostname = "devtest2";
-        dataTransObject2.setStart(new Date());
-        entry.setTransObj(dataTransObject2);
-        dTransMetaData.getTransQueue().put(entry2.getEntryId(), entry2);
+        for (int i = 0; i < subTransSize; i++) {
+            TransEntry<TransObject> entry = new TransEntry<>();
+            entry.setGlobalTransId(dTransMetaData.getTransId());
+            entry.setEntryId(UUID.randomUUID().toString());
+            entry.setTransStatus(0);
+            DataTransObject dataTransObject = new DataTransObject();
+            dataTransObject.driverName = "com.mysql";
+            dataTransObject.hostname = "devtest";
+            dataTransObject.port = 3306;
+            dataTransObject.setDesc("分布式事务测试");
+            dataTransObject.setName("分布式子事务: " + i);
+            dataTransObject.setId(UUID.randomUUID().toString());
+            dataTransObject.setStart(new Date());
+            entry.setTransObj(dataTransObject);
+            dTransMetaData.getTransQueue().put(entry.getEntryId(), entry);
+        }
         dTransMetaData.setEndTime(System.currentTimeMillis());
         return dTransMetaData;
     }
@@ -194,7 +194,7 @@ public class TransProcess {
     static void testProcess() {
         TransProcess transProcess = new TransProcess();
         TransContext context = new TransContext();
-        TransMetaData transMetaData = initTransMetaData();
+        TransMetaData transMetaData = initTransMetaData(5);
         try {
             transProcess.handler(context, transMetaData);
         } catch (Exception e) {
@@ -202,27 +202,13 @@ public class TransProcess {
         }
     }
 
-
-//    /**
-//     * 通过反射机制，动态代理机制实现事务执行器
-//     */
-//    static class ProcessHandler implements InvocationHandler {
-//        //代理目标对象
-//        private Object target;
-//
-//        public ProcessHandler(Object target) {
-//            this.target = target;
-//        }
-//
-//        @Override
-//        public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-//            System.out.println("开始执行");
-//            Object ret = method.invoke(target, args);
-//            System.out.println("结束执行");
-//            return ret;
-//        }
-//    }
-
+    static void testThreadTrans(int threads) {
+        for (int i = 0; i < threads; i++) {
+            new Thread(() -> {
+                testProcess();
+            }).start();
+        }
+    }
 
     public static void main(String[] args) throws Exception {
         //获取代理的class对象，通过class对象生成构造器等
@@ -233,8 +219,8 @@ public class TransProcess {
 //        //通过代理类生成对象
 //        InnerProcess process = (InnerProcess) Proxy.newProxyInstance(TransProcess.class.getClassLoader(), new Class[]{InnerProcess.class}, new ProcessHandler(innerProcess));
 //        process.commit();
-        testProcess();
-
+//        testProcess();
+        testThreadTrans(5);
 
     }
 
